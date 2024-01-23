@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #ifdef USE_LIBZ
 #include <zlib.h>
@@ -41,7 +42,6 @@ typedef unsigned long uLongf;
 
 
 
-static const char *programName="";
 static const char *usage =
 "\nUsage: ./bin2c -o <output-file> file1 [file2 [file3 [...]]]\n\n"
 "    Example: ./bin2c -o data.c a.bmp b.jpg c.png\n\n";
@@ -152,28 +152,22 @@ struct file_info *create_file_info(int input_file_count)
 {
         struct file_info *ret = NULL;
 
-        ret = (file_info*)malloc(sizeof(file_info));
+        ret = (struct file_info*)malloc(sizeof(struct file_info));
 
         if (ret)
         {
                 ret->input_file_list = (char**)calloc(input_file_count, sizeof(char*));
                 ret->input_file_count = input_file_count;
-                ret->output_file = (char*)malloc(sizeof(char*));
         }
 
         return ret;
 }
 
-void destory_file_info(file_info *info)
+void destory_file_info(struct file_info *info)
 {
         if (info != NULL)
         {
-                for (int i = 0; i < info->input_file_count; i++)
-                {
-                        free(info->input_file_list + i);
-                }
-
-                free(info->output_file);
+                free(info->input_file_list);
         }
 }
 
@@ -261,7 +255,7 @@ static int parser_args(int argc, char *argv[], struct file_info *info)
 
 
 	i=1;
-
+        int info_index = 0;
 	while(i<argc)
 	{
 		switch(argv[i][0])
@@ -277,17 +271,18 @@ static int parser_args(int argc, char *argv[], struct file_info *info)
 				goto parse_failed;
 			}
 		default:
-			info->input_file_list[i] = argv[i];
+			info->input_file_list[info_index] = argv[i];
+                        info_index++;
 			break;
 		}
 
 		i++;
 	}
 
+        return 0;
+
         parse_failed:
-                return 0;
-        parse_success:
-	        return 1;
+                return 1;
 }
 
 static int dump_files(struct file_info *info)
@@ -322,7 +317,7 @@ static int dump_files(struct file_info *info)
         }
 
         /* Process each file given on command line */
-        for (i = 0; i < argc - 3; i++)
+        for (i = 0; i < info->input_file_count; i++)
         {
                 infile = fopen(info->input_file_list[i], "rb");
 
@@ -467,31 +462,29 @@ static int dump_files(struct file_info *info)
                                 info->input_file_list[i]);
                 return 1;
         open_output_file_failed:
-                fprintf(stderr, "%s: can't open '%s' for writing\n",
-                                argv[0], info->output_file);
+                fprintf(stderr, "can't open '%s' for writing\n",
+                                info->output_file);
                 return 1;
 }
 
 
 int main(int argc, char *argv[])
 {
-        programName = argv[0];
-
         struct file_info *info = create_file_info(argc - 3);
 
         if (info == NULL)
         {
-                goto lack_of_memory:
+                goto lack_of_memory;
         }
 
-        if (!parser_args(argc, argv, info))
+        if (parser_args(argc, argv, info))
         {
                 goto parse_error;
         }
 
-        int failed = dump_files(info);
+        int is_failed = dump_files(info);
         destory_file_info(info);
-        return failed;
+        return is_failed;
 
         parse_error:
                 destory_file_info(info);
