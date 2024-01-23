@@ -39,54 +39,33 @@ typedef unsigned long uLongf;
 
 #define SUFFIXLEN 8
 
-static Bytef *source=NULL;       /* Buffer containing uncompressed data */
-static Bytef *dest=NULL;         /* Buffer containing compressed data */
-static uLongf sourceBufSize=0;   /* Buffer size */
-#ifdef USE_LIBZ
-static uLongf destBufSize=0;     /* Buffer size */
-#endif
 
-static uLongf sourceLen;         /* Length of uncompressed data */
-static uLongf destLen;           /* Length of compressed data */
-
-static FILE *infile=NULL;        /* The input file containing binary data */
-static FILE *outfile=NULL;       /* The output file 'data.c' */
 
 static const char *programName="";
+static const char *usage =
+"\nUsage: ./bin2c -o <output-file> file1 [file2 [file3 [...]]]\n\n"
+"    Example: ./bin2c -o data.c a.bmp b.jpg c.png\n\n";
 
 
-/*
- * Print error message and free allocated resources
- *
- */
+typedef struct _export_list {
+char                *export_data;
+struct _export_list *next;
+} export_list_t;
 
-static int error(char *msg1, char *msg2, char *msg3)
-{
-        fprintf(stderr, "%s: %s%s%s\n", programName, msg1, msg2, msg3);
+static export_list_t *exports_head = NULL;
 
-        if (infile != NULL)
-        {
-                fclose(infile);
-        }
+struct file_info {
+char    **input_file_list;
+int     input_file_count;
+char    *output_file;
+};
 
-        if (outfile != NULL)
-        {
-                fclose(outfile);
-        }
 
-        remove("data.c");
-        free(dest);
-        free(source);
-
-        return 1;
-}
 
 /*
  * Replacement for strrchr in case it isn't present in libc
  *
  */
-
-
 static char *my_strrchr(char *s, int c)
 {
         char *ptr = NULL;
@@ -168,27 +147,37 @@ int my_compress2(Bytef *dest, uLongf *destLen, const Bytef *source, uLong source
 }
 #endif
 
-static const char *usage =
-"\nUsage: ./bin2c -o <output-file> file1 [file2 [file3 [...]]]\n\n"
-"    Example: ./bin2c -o data.c a.bmp b.jpg c.png\n\n";
 
-static char *outputfile;
-static char **filelist;
-static int file_list; // FIXME
+struct file_info *create_file_info(int input_file_count)
+{
+        struct file_info *ret = NULL;
 
-typedef struct _export_list {
-char                *export_data;
-struct _export_list *next;
-} export_list_t;
+        ret = (file_info*)malloc(sizeof(file_info));
 
-struct parse_result {
-int     parse_success;
-char    **filelist;
-int     filelist_count;
-char    *outputfile;
-};
+        if (ret)
+        {
+                ret->input_file_list = (char**)calloc(input_file_count, sizeof(char*));
+                ret->input_file_count = input_file_count;
+                ret->output_file = (char*)malloc(sizeof(char*));
+        }
 
-static export_list_t *exports_head = NULL;
+        return ret;
+}
+
+void destory_file_info(file_info *info)
+{
+        if (info != NULL)
+        {
+                for (int i = 0; i < info->input_file_count; i++)
+                {
+                        free(info->input_file_list + i);
+                }
+
+                free(info->output_file);
+        }
+}
+
+
 
 static const char *add_export(const char *filename)
 {
@@ -260,20 +249,19 @@ static void print_exports(FILE *f)
 	}
 }
 
-static int parser_args(int argc, char *argv[])
+static int parser_args(int argc, char *argv[], struct file_info *info)
 {
 	int i;
 	int list_idx = 0;
 
 	if(argc < 4)
 	{
-		printf(usage);
-		return 0;
+		goto parse_failed;
 	}
-	filelist = (char**)calloc(argc - 3, sizeof(char*));
 
-	// try find outputfile
+
 	i=1;
+
 	while(i<argc)
 	{
 		switch(argv[i][0])
@@ -281,64 +269,68 @@ static int parser_args(int argc, char *argv[])
 		case '-':
 			if(argv[i][1] == 'o')
                         {
-				outputfile = argv[++i];
+				info->output_file = argv[++i];
 				break;
 			}
 			else if(argv[i][1] == 'h' || argv[i][1] == '?')
                         {
-				printf(usage);
-				return 0;
+				goto parse_failed;
 			}
 		default:
-			filelist[list_idx++] = argv[i];
+			info->input_file_list[i] = argv[i];
 			break;
 		}
+
 		i++;
 	}
 
-	return 1;
+        parse_failed:
+                return 0;
+        parse_success:
+	        return 1;
 }
 
-
-int main(int argc, char *argv[])
+static int dump_files(struct file_info *info)
 {
-        int i;
-        char suffix[SUFFIXLEN];
+        FILE *outfile = NULL;
+        FILE *infile = NULL;
+
+        /* Buffer containing uncompressed data */
+        Bytef *source=NULL;
+        /* Buffer containing compressed data */
+        Bytef *dest=NULL;
+        /* uncompressed Buffer size */
+        uLongf sourceBufSize = 0;
+        /* Length of uncompressed data */
+        uLongf sourceLen = 0;
+        /* Length of compressed data */
+        uLongf destLen = 0;
+
 #ifdef USE_LIBZ
         int result;
+        /* compressed Buffer size */
+        uLongf destBufSize = 0;
 #endif
+        int i;
         unsigned j;
-        char *ptr;
-        int position;
 
-        programName = argv[0];
+        outfile = fopen(info->output_file, "w");
 
-        if (!parser_args(argc, argv))
-        {
-                return 1;
-        }
-
-
-        outfile = fopen(outputfile, "w");
         if (outfile == NULL)
         {
-                fprintf(stderr, "%s: can't open 'data.c' for writing\n", argv[0]);
-                return 1;
+                goto open_output_file_failed;
         }
 
         /* Process each file given on command line */
-        for (i=0; i<argc-3; i++)
+        for (i = 0; i < argc - 3; i++)
         {
-                infile = fopen(filelist[i], "rb");
+                infile = fopen(info->input_file_list[i], "rb");
 
                 if (infile == NULL)
                 {
-                        return error("can't open '", argv[i], "' for reading");
+                        goto open_input_file_failed;
                 }
 
-
-                /* Read infile to source buffer */
-                sourceLen = 0;
                 while (!feof(infile))
                 {
                         if (sourceLen + BUFSIZE > sourceBufSize)
@@ -347,15 +339,16 @@ int main(int argc, char *argv[])
                                 source = realloc(source, sourceBufSize);
                                 if (source == NULL)
                                 {
-                                        return error("memory exhausted", "", "");
+                                        goto memory_exhausted;
+
                                 }
                         }
 
-                        sourceLen += fread(source+sourceLen, 1, BUFSIZE, infile);
+                        sourceLen += fread(source + sourceLen, 1, BUFSIZE, infile);
 
                         if (ferror(infile))
                         {
-                                return error("error reading '", argv[i], "'");
+                                goto error_input_reading;
                         }
                 }
 
@@ -371,7 +364,7 @@ int main(int argc, char *argv[])
                         dest = realloc(dest, destBufSize);
                         if (dest == NULL)
                         {
-                                return error("memory exhausted", "", "");
+                                goto compressed_memory_exhausted;
                         }
                 }
 
@@ -380,7 +373,7 @@ int main(int argc, char *argv[])
                 result = my_compress2(dest, &destLen, source, sourceLen, 9);
                 if (result != Z_OK)
                 {
-                        return error("error compressing '", argv[i], "'");
+                        goto error_compress;
                 }
 
 #else
@@ -392,46 +385,119 @@ int main(int argc, char *argv[])
 
                 /* Output dest buffer as C source code to outfile */
 
-                fprintf(outfile, "static const unsigned char %s[] = {\n", add_export(filelist[i]));
+                fprintf(outfile, "static const unsigned char %s[] = {\n",
+                                add_export(info->input_file_list[i]));
 
                 for (j=0; j<destLen-1; j++)
                 {
                         switch (j%8)
                         {
                         case 0:
-                                fprintf(outfile, "  0x%02x, ", ((unsigned) dest[j]) & 0xffu);
+                                fprintf(outfile, "  0x%02x, ",
+                                        ((unsigned) dest[j]) & 0xffu);
                                 break;
                         case 7:
-                                fprintf(outfile, "0x%02x,\n", ((unsigned) dest[j]) & 0xffu);
+                                fprintf(outfile, "0x%02x,\n",
+                                        ((unsigned) dest[j]) & 0xffu);
                                 break;
                         default:
-                                fprintf(outfile, "0x%02x, ", ((unsigned) dest[j]) & 0xffu);
+                                fprintf(outfile, "0x%02x, ",
+                                        ((unsigned) dest[j]) & 0xffu);
                                 break;
                         }
                 }
 
                 if ((destLen-1)%8 == 0)
                 {
-                        fprintf(outfile, "  0x%02x\n};\n\n", ((unsigned) dest[destLen-1]) & 0xffu);
+                        fprintf(outfile, "  0x%02x\n};\n\n",
+                                ((unsigned) dest[destLen-1]) & 0xffu);
                 }
                 else
                 {
-                        fprintf(outfile, "0x%02x\n};\n\n", ((unsigned) dest[destLen-1]) & 0xffu);
+                        fprintf(outfile, "0x%02x\n};\n\n",
+                                ((unsigned) dest[destLen-1]) & 0xffu);
                 }
-  }
+        }
 
-  fprintf(outfile, "/*********************************************\n");
-  fprintf(outfile, "Export:\n");
-  print_exports(outfile);
-  fprintf(outfile,"**********************************************/\n");
+        fprintf(outfile, "/*********************************************\n");
+        fprintf(outfile, "Export:\n");
+        print_exports(outfile);
+        fprintf(outfile,"**********************************************/\n");
 
-  fclose (outfile);
+        fclose (outfile);
 #ifdef USE_LIBZ
-  free (dest);
+        free (dest);
 #endif
-  free (source);
+        free (source);
+
+        return 0;
+
+#ifdef USE_LIBZ
+        error_compress:
+                fclose(outfile);
+                fclose(infile);
+                free(source);
+                free(dest);
+                fprintf(stderr, "error compressing '%s'\n",
+                                info->input_file_list[i]);
+                return 1;
+        compressed_memory_exhausted:
+                fclose(outfile);
+                fclose(infile);
+                free(source);
+                free(dest);
+                fprintf(stderr, "memory exhausted.\n");
+                return 1;
+#endif
+        error_input_reading:
+                fclose(outfile);
+                fclose(infile);
+                free(source);
+                fprintf(stderr, "error reading '%s'\n",
+                                info->input_file_list[i]);
+                return 1;
+        memory_exhausted:
+                fclose(outfile);
+                fclose(infile);
+                fprintf(stderr, "memory exhausted.\n");
+                return 1;
+        open_input_file_failed:
+                fclose(outfile);
+                fprintf(stderr, "can't open '%s' for reading",
+                                info->input_file_list[i]);
+                return 1;
+        open_output_file_failed:
+                fprintf(stderr, "%s: can't open '%s' for writing\n",
+                                argv[0], info->output_file);
+                return 1;
+}
 
 
+int main(int argc, char *argv[])
+{
+        programName = argv[0];
 
-  return 0;
+        struct file_info *info = create_file_info(argc - 3);
+
+        if (info == NULL)
+        {
+                goto lack_of_memory:
+        }
+
+        if (!parser_args(argc, argv, info))
+        {
+                goto parse_error;
+        }
+
+        int failed = dump_files(info);
+        destory_file_info(info);
+        return failed;
+
+        parse_error:
+                destory_file_info(info);
+                printf(usage);
+                return 1;
+        lack_of_memory:
+                fprintf(stderr, "memory exhausted.\n");
+                return 1;
 }
