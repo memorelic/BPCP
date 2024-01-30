@@ -37,15 +37,11 @@ typedef unsigned long uLongf;
 #endif
 
 #define BUFSIZE 16384            /* Increase buffer size by this amount */
-
 #define SUFFIXLEN 8
-
-
 
 static const char *usage =
 "\nUsage: ./bin2c -o <output-file> file1 [file2 [file3 [...]]]\n\n"
 "    Example: ./bin2c -o data.c a.bmp b.jpg c.png\n\n";
-
 
 typedef struct _export_list {
 char                *export_data;
@@ -92,7 +88,7 @@ static char *my_strrchr(char *s, int c)
  *
  */
 
-/* ===========================================================================
+/*
      Compresses the source buffer into the destination buffer. The level
    parameter has the same meaning as in deflateInit.  sourceLen is the byte
    length of the source buffer. Upon entry, destLen is the total size of the
@@ -191,9 +187,9 @@ static const char *add_export(const char *filename)
 	//char* strname = (char*)malloc(i);
 
 	strname[idx++] = '_';
-	if(ext)
+	if (ext)
         {
-		for(i=1; ext[i]; i++)
+		for (i=1; ext[i]; i++)
                 {
                         strname[idx++] = ext[i];
                 }
@@ -201,9 +197,9 @@ static const char *add_export(const char *filename)
 		strname[idx++] = '_';
 	}
 
-	for(i=0; (ext && &begin[i] < ext) || (!ext && begin[i]); i++)
+	for (i = 0; (ext && &begin[i] < ext) || (!ext && begin[i]); i++)
 	{
-		if(isalnum(begin[i]))
+		if (isalnum(begin[i]))
                 {
                         strname[idx++] = begin[i];
                 }
@@ -214,7 +210,7 @@ static const char *add_export(const char *filename)
 
 	}
 
-	if(strname[idx-1] == '_')
+	if (strname[idx-1] == '_')
         {
                 strcpy(strname+idx, "data");
         }
@@ -281,8 +277,8 @@ static int parser_args(int argc, char *argv[], struct file_info *info)
 
         return 0;
 
-        parse_failed:
-                return 1;
+parse_failed:
+        return 1;
 }
 
 static int dump_files(struct file_info *info)
@@ -428,43 +424,44 @@ static int dump_files(struct file_info *info)
         return 0;
 
 #ifdef USE_LIBZ
-        error_compress:
-                fclose(outfile);
-                fclose(infile);
-                free(source);
-                free(dest);
-                fprintf(stderr, "error compressing '%s'\n",
-                                info->input_file_list[i]);
-                return 1;
-        compressed_memory_exhausted:
-                fclose(outfile);
-                fclose(infile);
-                free(source);
-                free(dest);
-                fprintf(stderr, "memory exhausted.\n");
-                return 1;
+
+error_compress:
+        fclose(outfile);
+        fclose(infile);
+        free(source);
+        free(dest);
+        fprintf(stderr, "error compressing '%s'\n",
+                        info->input_file_list[i]);
+        return 1;
+compressed_memory_exhausted:
+        fclose(outfile);
+        fclose(infile);
+        free(source);
+        free(dest);
+        fprintf(stderr, "memory exhausted.\n");
+        return 1;
 #endif
-        error_input_reading:
-                fclose(outfile);
-                fclose(infile);
-                free(source);
-                fprintf(stderr, "error reading '%s'\n",
-                                info->input_file_list[i]);
-                return 1;
-        memory_exhausted:
-                fclose(outfile);
-                fclose(infile);
-                fprintf(stderr, "memory exhausted.\n");
-                return 1;
-        open_input_file_failed:
-                fclose(outfile);
-                fprintf(stderr, "can't open '%s' for reading",
-                                info->input_file_list[i]);
-                return 1;
-        open_output_file_failed:
-                fprintf(stderr, "can't open '%s' for writing\n",
-                                info->output_file);
-                return 1;
+error_input_reading:
+        fclose(outfile);
+        fclose(infile);
+        free(source);
+        fprintf(stderr, "error reading '%s'\n",
+                        info->input_file_list[i]);
+        return 1;
+memory_exhausted:
+        fclose(outfile);
+        fclose(infile);
+        fprintf(stderr, "memory exhausted.\n");
+        return 1;
+open_input_file_failed:
+        fclose(outfile);
+        fprintf(stderr, "can't open '%s' for reading",
+                        info->input_file_list[i]);
+        return 1;
+open_output_file_failed:
+        fprintf(stderr, "can't open '%s' for writing\n",
+                        info->output_file);
+        return 1;
 }
 
 
@@ -486,11 +483,11 @@ int main(int argc, char *argv[])
         destory_file_info(info);
         return is_failed;
 
-        parse_error:
-                destory_file_info(info);
-                printf(usage);
-                return 1;
-        lack_of_memory:
-                fprintf(stderr, "memory exhausted.\n");
-                return 1;
+parse_error:
+        destory_file_info(info);
+        printf(usage);
+        return 1;
+lack_of_memory:
+        fprintf(stderr, "memory exhausted.\n");
+        return 1;
 }
