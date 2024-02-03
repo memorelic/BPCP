@@ -4,7 +4,7 @@ INCLUDE(CheckFunctionExists)
 
 PROJECT(ubox C)
 
-ADD_DEFINITIONS(-Wall -Werror)
+ADD_DEFINITIONS(-Wall -Wextra -Werror)
 IF(CMAKE_C_COMPILER_VERSION VERSION_GREATER 6)
 	ADD_DEFINITIONS(-Wextra -Werror=implicit-function-declaration)
 	ADD_DEFINITIONS(-Wformat -Werror=format-security -Werror=format-nonliteral)
