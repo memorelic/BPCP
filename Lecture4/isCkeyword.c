@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -101,10 +100,38 @@ struct c_keyword_tag_info
         GQuark          keyword_atom;
         const char*     keyword_string;
         GQuark          standard_atom;
-        // struct c_standard_tag_info keyword_standard;
 };
 
 #define KEYWORD_BUFFER_SIZE 500
+
+int find_c_keyword(char* keyword_string, struct c_keyword_tag_info *c_keyword_info)
+{
+        GQuark keyword_atom =
+                g_quark_from_string(keyword_string);
+
+        int i = 0;
+
+        for (i = C_KEYWORD_FIRST;
+                i < C_KEYWORD_LAST; i++)
+        {
+                if (c_keyword_info[i].keyword_atom
+                        == keyword_atom)
+                {
+                        break;
+                }
+        }
+
+        if (i < C_KEYWORD_LAST)
+        {
+                return i;
+
+        }
+        else
+        {
+                return -1;
+        }
+
+}
 
 int main(int argc, char* argv[])
 {
@@ -199,36 +226,26 @@ int main(int argc, char* argv[])
 
         char keyword_string[KEYWORD_BUFFER_SIZE] = {0};
 
+        /* User Input */
+
         printf("Please Type a word to find if it is a keyword in C\n");
 
         while (scanf("%s", keyword_string))
         {
-                GQuark keyword_atom =
-                        g_quark_from_string(keyword_string);
+                int index = find_c_keyword(keyword_string, c_keyword_info);
 
-                int i = 0;
-
-                for (i = C_KEYWORD_FIRST;
-                        i < C_KEYWORD_LAST; i++)
-                {
-                        if (c_keyword_info[i].keyword_atom
-                                == keyword_atom)
-                        {
-                                break;
-                        }
-                }
-
-                if (i < C_KEYWORD_LAST)
+                if (index != -1)
                 {
                         printf("%s is %s standard keyword\n",
-                                keyword_string,
-                                g_quark_to_string(c_keyword_info[i].standard_atom));
+                        keyword_string,
+                        g_quark_to_string(c_keyword_info[index].standard_atom));
                 }
                 else
                 {
                         printf("%s is not a C keyword\n",
                         keyword_string);
                 }
+
 
                 printf("Type word to continue, Ctrl + C to end\n");
         }
