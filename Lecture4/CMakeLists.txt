@@ -10,9 +10,15 @@ add_executable(isCkeyword)
 
 file(GLOB sources CONFIGURE_DEPENDS ./*.c)
 
+if (MSVC)
+        target_compile_options(isCkeyword PRIVATE /W4 /WX)
+else()
+        target_compile_options(isCkeyword PRIVATE -Wall -Wextra)
+endif()
+
 target_sources(isCkeyword PRIVATE ${sources})
 
-target_include_directories(isCkeyword PRIVATE GLIB2_INCLUDE_DIRS)
+#target_include_directories(isCkeyword PRIVATE GLIB2_INCLUDE_DIRS)
 
 target_link_libraries(isCkeyword GLIB2::GLIB2)
 

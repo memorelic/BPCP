@@ -104,7 +104,8 @@ struct c_keyword_tag_info
 
 #define KEYWORD_BUFFER_SIZE 500
 
-int find_c_keyword(char* keyword_string, struct c_keyword_tag_info *c_keyword_info)
+int find_c_keyword(char* keyword_string,
+        struct c_keyword_tag_info c_keyword_info[])
 {
         GQuark keyword_atom =
                 g_quark_from_string(keyword_string);
@@ -133,7 +134,7 @@ int find_c_keyword(char* keyword_string, struct c_keyword_tag_info *c_keyword_in
 
 }
 
-int main(int argc, char* argv[])
+int main(void)
 {
         /* initialize */
 
@@ -247,7 +248,7 @@ int main(int argc, char* argv[])
                 }
 
 
-                printf("Type word to continue, Ctrl + C to end\n");
+                printf("Continue input or Ctrl + C to end\n");
         }
 
         return 0;

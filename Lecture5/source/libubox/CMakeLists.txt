@@ -1,0 +1,5 @@
+add_subdirectory(include)
+add_subdirectory(lib)
+#add_subdirectory(examples)
+#add_subdirectory(lua)
+#add_subdirectory(tests)
